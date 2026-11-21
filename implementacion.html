@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Implementación · Modelos 3D Katze, Eco &amp; Odoo</title>
+  <meta name="description" content="Guía visual interactiva de cómo implementar cada modelo 3D (Eco, Katze, Odoo, O) y la animación completa en cualquier página web." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif;
+      background: #f5f3ee;
+      color: #1c1b19;
+      line-height: 1.5;
+      padding: 32px 24px 64px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 16px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid rgba(28, 27, 25, 0.10);
+    }
+
+    .eyebrow {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(28, 27, 25, 0.48);
+      margin-bottom: 6px;
+    }
+    h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }
+    .subtitle { font-size: 14px; color: rgba(28, 27, 25, 0.62); margin-top: 4px; }
+
+    .header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .nav-link {
+      font-size: 13px;
+      font-weight: 500;
+      color: #1c1b19;
+      text-decoration: none;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(28, 27, 25, 0.12);
+      background: #ffffff;
+      transition: background-color 0.18s ease;
+    }
+    .nav-link:hover { background: #ece8df; }
+
+    .surface-switch {
+      display: inline-flex;
+      background: rgba(255, 255, 255, 0.85);
+      border: 1px solid rgba(28, 27, 25, 0.10);
+      padding: 4px;
+      border-radius: 999px;
+      gap: 2px;
+    }
+    .surface-btn {
+      border: none;
+      background: transparent;
+      color: rgba(28, 27, 25, 0.65);
+      font: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .surface-btn.active {
+      background: #1c1b19;
+      color: #f7f4ee;
+    }
+
+    .section-title {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      margin-bottom: 14px;
+    }
+
+    /* Cuadrícula de los 4 modelos individuales */
+    .models-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 960px) { .models-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 540px) { .models-grid { grid-template-columns: 1fr; } }
+
+    .card {
+      background: #ffffff;
+      border: 1px solid rgba(28, 27, 25, 0.09);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .viewport {
+      height: 230px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.25s ease;
+    }
+
+    /* Fondos de prueba para comprobar la transparencia real */
+    body[data-surface="light"] .viewport { background: #ffffff; }
+    body[data-surface="dark"]  .viewport { background: radial-gradient(circle at 50% 40%, #23242b 0%, #111216 100%); }
+    body[data-surface="alpha"] .viewport {
+      background-color: #ebe6dc;
+      background-image:
+        linear-gradient(45deg, rgba(28, 27, 25, 0.05) 25%, transparent 25%),
+        linear-gradient(-45deg, rgba(28, 27, 25, 0.05) 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, rgba(28, 27, 25, 0.05) 75%),
+        linear-gradient(-45deg, transparent 75%, rgba(28, 27, 25, 0.05) 75%);
+      background-size: 22px 22px;
+      background-position: 0 0, 0 11px, 11px -11px, -11px 0;
+    }
+
+    .card-body {
+      padding: 14px 16px;
+      border-top: 1px solid rgba(28, 27, 25, 0.07);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .card-title { font-size: 14px; font-weight: 600; }
+    .file-pill {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 6px;
+      background: #f2efe9;
+      color: #3a3733;
+      text-decoration: none;
+    }
+    .file-pill:hover { background: #e6e0d6; }
+    .card-desc { font-size: 12px; color: rgba(28, 27, 25, 0.60); }
+
+    /* Tarjeta destacada: animación completa de transformación */
+    .showcase-card {
+      background: #ffffff;
+      border: 1px solid rgba(28, 27, 25, 0.09);
+      border-radius: 16px;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+    }
+    @media (max-width: 820px) { .showcase-card { grid-template-columns: 1fr; } }
+
+    .showcase-card .viewport {
+      height: 290px;
+      border-right: 1px solid rgba(28, 27, 25, 0.07);
+    }
+    @media (max-width: 820px) {
+      .showcase-card .viewport { border-right: none; border-bottom: 1px solid rgba(28, 27, 25, 0.07); }
+    }
+    .showcase-info {
+      padding: 24px 26px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 12px;
+    }
+    .showcase-info h2 { font-size: 18px; font-weight: 600; }
+    .showcase-info p { font-size: 13.5px; color: rgba(28, 27, 25, 0.68); }
+    .steps-list {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 4px;
+    }
+    .steps-list li {
+      font-size: 12px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      background: #f4f1eb;
+      color: #2b2926;
+    }
+
+    /* Panel de ejemplos de código copy-paste */
+    .code-panel {
+      background: #ffffff;
+      border: 1px solid rgba(28, 27, 25, 0.09);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    .code-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 14px;
+      background: #faf8f4;
+      border-bottom: 1px solid rgba(28, 27, 25, 0.08);
+    }
+    .tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tab {
+      border: none;
+      background: transparent;
+      color: rgba(28, 27, 25, 0.62);
+      font: inherit;
+      font-size: 12.5px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .tab.active { background: #1c1b19; color: #f8f6f1; }
+
+    .selector-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    select {
+      font: inherit;
+      font-size: 12px;
+      padding: 5px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(28, 27, 25, 0.14);
+      background: #ffffff;
+      color: #1c1b19;
+    }
+    .copy-btn {
+      border: 1px solid rgba(28, 27, 25, 0.14);
+      background: #ffffff;
+      color: #1c1b19;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 5px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    .copy-btn:hover { background: #efece6; }
+
+    pre {
+      padding: 20px;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12.5px;
+      line-height: 1.65;
+      color: #1c1b19;
+    }
+  </style>
+</head>
+<body data-surface="light">
+  <div class="container">
+    <header>
+      <div>
+        <div class="eyebrow">Guía de Integración · Sin Base · Fondo Transparente</div>
+        <h1>Cómo implementar cada modelo 3D</h1>
+        <p class="subtitle">Todos los modelos se entregan en <code>.glb</code> (glTF 2.0) y en el componente <code>&lt;katze-logo-3d&gt;</code> sin dependencias. Arrastra cualquiera para inspeccionarlo.</p>
+      </div>
+      <div class="header-actions">
+        <div class="surface-switch" role="group" aria-label="Fondo de prueba">
+          <button class="surface-btn active" data-surface="light" type="button">Claro</button>
+          <button class="surface-btn" data-surface="dark" type="button">Oscuro</button>
+          <button class="surface-btn" data-surface="alpha" type="button">Alfa</button>
+        </div>
+        <a class="nav-link" href="index.html">← Ver exhibición</a>
+      </div>
+    </header>
+
+    <!-- 1. Los 4 modelos individuales -->
+    <section>
+      <h2 class="section-title">1. Modelos individuales (sin base)</h2>
+      <div class="models-grid">
+        <article class="card">
+          <div class="viewport">
+            <katze-logo-3d model="eco" style="width: 210px; height: 210px;"></katze-logo-3d>
+          </div>
+          <div class="card-body">
+            <div class="card-head">
+              <span class="card-title">01 · Eco</span>
+              <a class="file-pill" href="models/eco.glb" download>eco.glb</a>
+            </div>
+            <p class="card-desc">5 piezas en capas escalonadas en negro mate escultórico.</p>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="viewport">
+            <katze-logo-3d model="katze" style="width: 210px; height: 210px;"></katze-logo-3d>
+          </div>
+          <div class="card-body">
+            <div class="card-head">
+              <span class="card-title">02 · Katze</span>
+              <a class="file-pill" href="models/katze.glb" download>katze.glb</a>
+            </div>
+            <p class="card-desc">Contorno 3D con muesca circular en oreja derecha + Eco al centro.</p>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="viewport">
+            <katze-logo-3d model="odoo" style="width: 220px; height: 210px;"></katze-logo-3d>
+          </div>
+          <div class="card-body">
+            <div class="card-head">
+              <span class="card-title">03 · Odoo</span>
+              <a class="file-pill" href="models/odoo.glb" download>odoo.glb</a>
+            </div>
+            <p class="card-desc">Logotipo completo con colores oficiales <code>#714B67</code> y <code>#8F8F8F</code>.</p>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="viewport">
+            <katze-logo-3d model="o" style="width: 210px; height: 210px;"></katze-logo-3d>
+          </div>
+          <div class="card-body">
+            <div class="card-head">
+              <span class="card-title">04 · Odoo · O</span>
+              <a class="file-pill" href="models/odoo-o.glb" download>odoo-o.glb</a>
+            </div>
+            <p class="card-desc">Isotipo circular en morado oficial <code>#714B67</code>.</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- 2. Animación completa de transformación -->
+    <section>
+      <h2 class="section-title">2. Animación completa de transformación (un solo archivo)</h2>
+      <div class="showcase-card">
+        <div class="viewport">
+          <katze-logo-3d model="showcase" hold="3.6" style="width: 270px; height: 270px;"></katze-logo-3d>
+        </div>
+        <div class="showcase-info">
+          <div class="card-head">
+            <h2>Secuencia completa Eco → Katze → Odoo → O</h2>
+            <a class="file-pill" href="models/katze-showcase-animated.glb" download>katze-showcase-animated.glb</a>
+          </div>
+          <p>
+            Disponible tanto en un único archivo <strong>glTF 2.0 animado</strong> (<code>models/katze-showcase-animated.glb</code>,
+            loop de 24 s con trazado progresivo de Katze, salida de las 3 letras grises y <em>morph targets</em> de plastilina)
+            como mediante el componente <code>&lt;katze-logo-3d model="showcase"&gt;</code>.
+          </p>
+          <ul class="steps-list">
+            <li>01 Eco → 02 Katze (trazado 3D)</li>
+            <li>02 Katze → 03 Odoo</li>
+            <li>03 Odoo → 04 O (salida de d, o, o)</li>
+            <li>04 O → 01 Eco (plastilina 3D)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Código listo para copiar -->
+    <section>
+      <h2 class="section-title">3. Código listo para copiar</h2>
+      <div class="code-panel">
+        <div class="code-bar">
+          <div class="tabs" role="tablist">
+            <button class="tab active" data-stack="mv" type="button">&lt;model-viewer&gt; (.glb)</button>
+            <button class="tab" data-stack="wc" type="button">&lt;katze-logo-3d&gt; (0 dependencias)</button>
+            <button class="tab" data-stack="r3f" type="button">React / Three.js (.glb)</button>
+          </div>
+          <div class="selector-row">
+            <select id="model-select" aria-label="Elegir modelo para el ejemplo de código">
+              <option value="eco">01 · Eco (eco.glb)</option>
+              <option value="katze">02 · Katze (katze.glb)</option>
+              <option value="odoo">03 · Odoo (odoo.glb)</option>
+              <option value="o">04 · Odoo · O (odoo-o.glb)</option>
+              <option value="showcase" selected>Animación completa (katze-showcase-animated.glb)</option>
+            </select>
+            <button class="copy-btn" id="btn-copy" type="button">Copiar código</button>
+          </div>
+        </div>
+        <pre id="code-output"></pre>
+      </div>
+    </section>
+  </div>
+
+  <!-- Scripts locales del componente -->
+  <script src="js/math3d.js"></script>
+  <script src="js/logo-geometries.js"></script>
+  <script src="js/webgl-renderer.js"></script>
+  <script src="js/choreography.js"></script>
+  <script src="js/katze-logo-3d.js"></script>
+
+  <script>
+  (() => {
+    'use strict';
+
+    const FILE_MAP = {
+      eco: 'models/eco.glb',
+      katze: 'models/katze.glb',
+      odoo: 'models/odoo.glb',
+      o: 'models/odoo-o.glb',
+      showcase: 'models/katze-showcase-animated.glb'
+    };
+
+    const codeOutput  = document.getElementById('code-output');
+    const modelSelect = document.getElementById('model-select');
+    const copyBtn     = document.getElementById('btn-copy');
+    const stackTabs   = Array.from(document.querySelectorAll('.tab'));
+    const surfaceBtns = Array.from(document.querySelectorAll('.surface-btn'));
+    const allWidgets  = Array.from(document.querySelectorAll('katze-logo-3d'));
+
+    let currentStack = 'mv';
+
+    function buildSnippet(stack, modelKey) {
+      const file = FILE_MAP[modelKey];
+      const isShowcase = modelKey === 'showcase';
+
+      if (stack === 'mv') {
+        const animAttrs = isShowcase
+          ? '  autoplay\n  animation-name="KatzeFullShowcase"'
+          : '  auto-rotate\n  rotation-per-second="24deg"';
+        return `<!-- Funciona en HTML, Webflow, Framer, Shopify y WordPress -->
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"><\/script>
+
+<model-viewer
+  src="${file}"
+${animAttrs}
+  camera-controls
+  disable-zoom
+  camera-orbit="45deg 54.7deg 2.5m"
+  field-of-view="20deg"
+  shadow-intensity="0"
+  style="width: 320px; height: 320px; background: transparent;">
+</model-viewer>`;
+      }
+
+      if (stack === 'wc') {
+        return `<!-- Cero librerías externas · Fondo 100% transparente · Shader PBR exacto -->
+<script src="js/math3d.js"><\/script>
+<script src="js/logo-geometries.js"><\/script>
+<script src="js/webgl-renderer.js"><\/script>
+<script src="js/choreography.js"><\/script>
+<script src="js/katze-logo-3d.js"><\/script>
+
+<!-- Usa tone="light" en fondos claros o tone="dark" en fondos oscuros -->
+<katze-logo-3d
+  model="${modelKey}"
+  tone="light"
+  speed="0.44"
+  style="width: 320px; height: 320px;">
+</katze-logo-3d>`;
+      }
+
+      // React Three Fiber + Three.js
+      if (isShowcase) {
+        return `// React Three Fiber (Next.js / Vite / React) — Animación completa
+import { Canvas } from '@react-three/fiber';
+import { Environment, OrbitControls, useAnimations, useGLTF } from '@react-three/drei';
+import { useEffect, useRef } from 'react';
+
+function AnimatedShowcase() {
+  const group = useRef();
+  const { scene, animations } = useGLTF('/${file}');
+  const { actions } = useAnimations(animations, group);
+
+  useEffect(() => {
+    actions['KatzeFullShowcase']?.reset().play();
+  }, [actions]);
+
+  return <primitive ref={group} object={scene} />;
+}
+
+export function KatzeShowcase3D() {
+  return (
+    <Canvas orthographic camera={{ position: [5, 4.08, 5], zoom: 210 }} gl={{ alpha: true }}>
+      <Environment preset="studio" />
+      <AnimatedShowcase />
+      <OrbitControls enableZoom={false} enablePan={false} />
+    </Canvas>
+  );
+}`;
+      }
+
+      return `// React Three Fiber (Next.js / Vite / React) — Modelo individual
+import { Canvas, useFrame } from '@react-three/fiber';
+import { Environment, OrbitControls, useGLTF } from '@react-three/drei';
+import { useRef } from 'react';
+
+function FloatingLogo() {
+  const { scene } = useGLTF('/${file}');
+  const ref = useRef();
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    ref.current.rotation.y = t * 0.44;
+    ref.current.position.y = Math.sin(t * 1.15) * 0.04;
+  });
+  return <primitive ref={ref} object={scene} />;
+}
+
+export function Logo3D() {
+  return (
+    <Canvas orthographic camera={{ position: [5, 4.08, 5], zoom: 210 }} gl={{ alpha: true }}>
+      <Environment preset="studio" />
+      <FloatingLogo />
+      <OrbitControls enableZoom={false} enablePan={false} />
+    </Canvas>
+  );
+}`;
+    }
+
+    function updateCode() {
+      codeOutput.textContent = buildSnippet(currentStack, modelSelect.value);
+    }
+
+    stackTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        currentStack = tab.dataset.stack;
+        stackTabs.forEach(t => t.classList.toggle('active', t === tab));
+        updateCode();
+      });
+    });
+
+    modelSelect.addEventListener('change', updateCode);
+    updateCode();
+
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(codeOutput.textContent);
+        copyBtn.textContent = 'Copiado';
+        setTimeout(() => (copyBtn.textContent = 'Copiar código'), 1400);
+      } catch (_) {}
+    });
+
+    // Cambio de fondo en vivo para probar transparencia y tono claro/oscuro
+    surfaceBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const surface = btn.dataset.surface;
+        document.body.dataset.surface = surface;
+        surfaceBtns.forEach(b => b.classList.toggle('active', b === btn));
+        allWidgets.forEach(w => w.setAttribute('tone', surface === 'dark' ? 'dark' : 'light'));
+      });
+    });
+  })();
+  </script>
+</body>
+</html>

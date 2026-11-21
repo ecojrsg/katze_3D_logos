@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Exhibición 3D Isométrica · Eco, Katze &amp; Odoo</title>
+  <meta name="description" content="Exhibición 3D isométrica interactiva de Eco, Katze, Odoo y O con pedestal de galería, sombras suaves y transiciones coreografiadas." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #efece6;
+      color: #1c1b19;
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+
+    #stage {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      cursor: grab;
+      touch-action: none;
+    }
+    #stage.dragging { cursor: grabbing; }
+
+    /* Ficha de galería (arriba izquierda) */
+    .placard {
+      position: fixed;
+      top: 28px;
+      left: 32px;
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .placard-eyebrow {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(28, 27, 25, 0.46);
+    }
+    .placard-title {
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: rgba(28, 27, 25, 0.86);
+    }
+    .placard-meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: rgba(28, 27, 25, 0.54);
+    }
+    .swatches { display: inline-flex; align-items: center; gap: 4px; }
+    .swatch {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12);
+    }
+
+    /* Telemetría de ángulo y enlace a implementación (arriba derecha) */
+    .top-right {
+      position: fixed;
+      top: 28px;
+      right: 32px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+    }
+    .telemetry {
+      pointer-events: none;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      color: rgba(28, 27, 25, 0.38);
+    }
+    .impl-link {
+      font-size: 12px;
+      font-weight: 500;
+      color: rgba(28, 27, 25, 0.58);
+      text-decoration: none;
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(28, 27, 25, 0.09);
+      background: rgba(248, 246, 241, 0.72);
+      backdrop-filter: blur(8px);
+      transition: color 0.18s ease, background-color 0.18s ease;
+    }
+    .impl-link:hover {
+      color: #141312;
+      background: rgba(255, 255, 255, 0.92);
+    }
+
+    /* Barra flotante inferior de controles */
+    .controls-wrap {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 9px;
+      max-width: calc(100vw - 24px);
+    }
+    .hint {
+      font-size: 11.5px;
+      letter-spacing: 0.03em;
+      color: rgba(28, 27, 25, 0.42);
+      transition: opacity 0.6s ease;
+      pointer-events: none;
+    }
+    .hint.hidden { opacity: 0; }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 5px;
+      border-radius: 999px;
+      background: rgba(248, 246, 241, 0.82);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(28, 27, 25, 0.085);
+      box-shadow:
+        0 10px 30px -10px rgba(28, 27, 25, 0.11),
+        0 2px 6px rgba(28, 27, 25, 0.04),
+        inset 0 1px 0 rgba(255, 255, 255, 0.72);
+    }
+
+    .exhibit-tabs { display: inline-flex; align-items: center; gap: 2px; }
+
+    .tab-btn {
+      position: relative;
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: rgba(28, 27, 25, 0.62);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 7px 13px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      cursor: pointer;
+      overflow: hidden;
+      transition: background-color 0.22s ease, color 0.22s ease;
+    }
+    .tab-btn:hover { background: rgba(28, 27, 25, 0.055); color: #141312; }
+    .tab-btn.active { background: #1c1b19; color: #f7f4ee; }
+    .tab-btn.active[data-accent="odoo"] { background: #714B67; color: #faf7f9; }
+
+    .label-short { display: none; }
+    .pill.compact-o .label-full { display: none; }
+    .pill.compact-o .label-short { display: inline; }
+
+    .tab-num {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 10.5px;
+      opacity: 0.65;
+    }
+    .tab-progress {
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      height: 2px;
+      width: 0%;
+      background: rgba(255, 255, 255, 0.55);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    }
+    .tab-btn.active .tab-progress { opacity: 1; }
+
+    .btn {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: rgba(28, 27, 25, 0.74);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 7px 11px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+    }
+    .btn:hover { background: rgba(28, 27, 25, 0.06); color: #141312; }
+    .btn:active { transform: scale(0.96); }
+    .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+    .divider {
+      width: 1px;
+      height: 16px;
+      background: rgba(28, 27, 25, 0.10);
+      margin: 0 3px;
+      flex-shrink: 0;
+    }
+
+    .fallback {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      text-align: center;
+      color: #3a3733;
+      background: #efece6;
+    }
+
+    @media (max-width: 740px) {
+      .placard { top: 18px; left: 18px; }
+      .top-right { top: 18px; right: 18px; }
+      .telemetry { display: none; }
+      .controls-wrap { bottom: 16px; }
+      .btn-label { display: none; }
+      .label-full { display: none; }
+      .label-short { display: inline; }
+      .tab-btn { padding: 7px 10px; font-size: 11.5px; gap: 5px; }
+      .btn { padding: 7px 9px; }
+      .hint { font-size: 10.5px; text-align: center; }
+    }
+
+    @media (max-width: 440px) {
+      .tab-num { display: none; }
+      .tab-btn { padding: 6px 10px; font-size: 11.5px; }
+      .btn { padding: 6px 8px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="stage" aria-label="Exhibición interactiva 3D isométrica de logos"></canvas>
+
+  <header class="placard">
+    <span class="placard-eyebrow" id="placard-eyebrow">01 / 04 · EXHIBICIÓN ISOMÉTRICA</span>
+    <h1 class="placard-title" id="placard-title">Eco</h1>
+    <div class="placard-meta">
+      <span class="swatches" id="placard-swatches"></span>
+      <span id="placard-sub">Escultura en Negro Mate · 5 capas</span>
+    </div>
+  </header>
+
+  <div class="top-right">
+    <div class="telemetry" id="telemetry">ISO · 35.3° / 45.0°</div>
+    <a class="impl-link" href="implementacion.html">Cómo implementar →</a>
+  </div>
+
+  <div class="controls-wrap">
+    <span class="hint" id="hint">Arrastra para inspeccionar · Rueda para zoom · Flechas para cambiar</span>
+    <nav class="pill" id="pill" aria-label="Controles de exhibición">
+      <div class="exhibit-tabs" role="tablist" aria-label="Logos en exhibición">
+        <button class="tab-btn active" data-index="0" type="button" role="tab" aria-selected="true">
+          <span class="tab-num">01</span><span>Eco</span>
+          <span class="tab-progress"></span>
+        </button>
+        <button class="tab-btn" data-index="1" type="button" role="tab" aria-selected="false">
+          <span class="tab-num">02</span><span>Katze</span>
+          <span class="tab-progress"></span>
+        </button>
+        <button class="tab-btn" data-index="2" data-accent="odoo" type="button" role="tab" aria-selected="false">
+          <span class="tab-num">03</span><span>Odoo</span>
+          <span class="tab-progress"></span>
+        </button>
+        <button class="tab-btn" data-index="3" data-accent="odoo" type="button" role="tab" aria-selected="false">
+          <span class="tab-num">04</span><span class="label-full">Odoo · O</span><span class="label-short">O</span>
+          <span class="tab-progress"></span>
+        </button>
+      </div>
+      <span class="divider" aria-hidden="true"></span>
+      <button class="btn" id="btn-toggle" type="button" aria-pressed="false" title="Pausar o reanudar (Espacio)">
+        <svg id="icon-pause" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+          <line x1="8" y1="5" x2="8" y2="19"></line>
+          <line x1="16" y1="5" x2="16" y2="19"></line>
+        </svg>
+        <svg id="icon-play" viewBox="0 0 24 24" fill="currentColor" style="display:none;">
+          <path d="M8 5.14v14l11-7-11-7z"></path>
+        </svg>
+        <span class="btn-label" id="label-toggle">Pausar</span>
+      </button>
+      <button class="btn" id="btn-reset" type="button" title="Restaurar vista isométrica (R)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"></path>
+          <path d="M12 12l8-4.5"></path>
+          <path d="M12 12v9"></path>
+          <path d="M12 12L4 7.5"></path>
+        </svg>
+        <span class="btn-label">Isométrica</span>
+      </button>
+    </nav>
+  </div>
+
+  <div class="fallback" id="fallback">
+    <p>Tu navegador no pudo inicializar WebGL2 para mostrar la escena 3D.</p>
+  </div>
+
+  <!-- Módulos legibles sin dependencias ni compilación -->
+  <script src="js/math3d.js"></script>
+  <script src="js/logo-geometries.js"></script>
+  <script src="js/webgl-renderer.js"></script>
+  <script src="js/choreography.js"></script>
+  <script>
+  (() => {
+    'use strict';
+
+    const { ISO_AZIMUTH, ISO_ELEVATION, Easing, Geometries } = window.Katze3D;
+    const canvas = document.getElementById('stage');
+    const renderer = window.Katze3D.createRenderer(canvas, { transparent: false });
+
+    if (!renderer) {
+      document.getElementById('fallback').style.display = 'flex';
+      return;
+    }
+
+    const director = window.Katze3D.createDirector(renderer.gl);
+    const stage    = Geometries.buildExhibitionStage(renderer.gl);
+
+    // -------------------------------------------------------------------------
+    // Catálogo de las 4 piezas en exhibición
+    // -------------------------------------------------------------------------
+    const EXHIBITS = [
+      { num: '01 / 04', title: 'Eco',      sub: 'Escultura en Negro Mate · 5 capas',    swatches: ['#1d1e21'] },
+      { num: '02 / 04', title: 'Katze',    sub: 'Contorno 3D + Eco · Negro Mate',       swatches: ['#1d1e21'] },
+      { num: '03 / 04', title: 'Odoo',     sub: 'Logotipo completo · #714B67 / #8F8F8F', swatches: ['#714B67', '#8F8F8F'] },
+      { num: '04 / 04', title: 'Odoo · O', sub: 'Isotipo · #714B67',                    swatches: ['#714B67'] }
+    ];
+
+    const HOLD_SECONDS = 6.2;
+    let currentExhibit = 0;
+    let fromExhibit = 0;
+    let transProgress = 1.0;
+    let holdTimer = 0.0;
+    let isPaused = false;
+    let animTime = 0.0;
+
+    // -------------------------------------------------------------------------
+    // Referencias de UI y actualización de ficha
+    // -------------------------------------------------------------------------
+    const placardEyebrow = document.getElementById('placard-eyebrow');
+    const placardTitle   = document.getElementById('placard-title');
+    const placardSub     = document.getElementById('placard-sub');
+    const placardSwatch  = document.getElementById('placard-swatches');
+    const telemetryEl    = document.getElementById('telemetry');
+    const hintEl         = document.getElementById('hint');
+    const pillEl         = document.getElementById('pill');
+    const tabBtns        = Array.from(document.querySelectorAll('.tab-btn'));
+    const tabProgressEls = tabBtns.map(btn => btn.querySelector('.tab-progress'));
+    const btnToggle      = document.getElementById('btn-toggle');
+    const iconPause      = document.getElementById('icon-pause');
+    const iconPlay       = document.getElementById('icon-play');
+    const labelToggle    = document.getElementById('label-toggle');
+    const btnReset       = document.getElementById('btn-reset');
+
+    let hasInteracted = false;
+    function hideHint() {
+      if (!hasInteracted) {
+        hasInteracted = true;
+        hintEl.classList.add('hidden');
+      }
+    }
+
+    function updatePlacard(index) {
+      const ex = EXHIBITS[index];
+      placardEyebrow.textContent = `${ex.num} · EXHIBICIÓN ISOMÉTRICA`;
+      placardTitle.textContent = ex.title;
+      placardSub.textContent = ex.sub;
+      placardSwatch.innerHTML = ex.swatches.map(c => `<span class="swatch" style="background:${c}"></span>`).join('');
+      tabBtns.forEach((btn, i) => {
+        const active = i === index;
+        btn.classList.toggle('active', active);
+        btn.setAttribute('aria-selected', String(active));
+        if (!active) tabProgressEls[i].style.width = '0%';
+      });
+    }
+
+    function switchExhibit(targetIndex) {
+      if (targetIndex === currentExhibit && transProgress >= 0.999) {
+        holdTimer = 0;
+        return;
+      }
+      fromExhibit = currentExhibit;
+      currentExhibit = targetIndex;
+      transProgress = 0.0;
+      holdTimer = 0.0;
+      updatePlacard(currentExhibit);
+    }
+
+    tabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        hideHint();
+        switchExhibit(Number(btn.dataset.index));
+      });
+    });
+
+    updatePlacard(0);
+
+    // -------------------------------------------------------------------------
+    // Cámara isométrica interactiva (arrastrar para rotar, rueda para zoom)
+    // -------------------------------------------------------------------------
+    const DEFAULT_ZOOM = 2.88;
+    const cam = {
+      azim: ISO_AZIMUTH, elev: ISO_ELEVATION, zoom: DEFAULT_ZOOM,
+      targetAzim: ISO_AZIMUTH, targetElev: ISO_ELEVATION, targetZoom: DEFAULT_ZOOM
+    };
+
+    function resetIsometric() {
+      const twoPi = Math.PI * 2;
+      cam.targetAzim = ISO_AZIMUTH + Math.round((cam.targetAzim - ISO_AZIMUTH) / twoPi) * twoPi;
+      cam.targetElev = ISO_ELEVATION;
+      cam.targetZoom = DEFAULT_ZOOM;
+    }
+
+    let dragging = false, lastX = 0, lastY = 0;
+    canvas.addEventListener('pointerdown', e => {
+      dragging = true; lastX = e.clientX; lastY = e.clientY;
+      canvas.classList.add('dragging');
+      canvas.setPointerCapture(e.pointerId);
+      hideHint();
+    });
+    canvas.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      cam.targetAzim -= (e.clientX - lastX) * 0.0068;
+      cam.targetElev = Math.max(0.08, Math.min(1.42, cam.targetElev + (e.clientY - lastY) * 0.0058));
+      lastX = e.clientX; lastY = e.clientY;
+    });
+    const endDrag = e => {
+      if (!dragging) return;
+      dragging = false;
+      canvas.classList.remove('dragging');
+      try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    };
+    canvas.addEventListener('pointerup', endDrag);
+    canvas.addEventListener('pointercancel', endDrag);
+    canvas.addEventListener('dblclick', resetIsometric);
+
+    canvas.addEventListener('wheel', e => {
+      e.preventDefault();
+      hideHint();
+      cam.targetZoom = Math.max(1.6, Math.min(4.7, cam.targetZoom * (1 + e.deltaY * 0.0008)));
+    }, { passive: false });
+
+    btnReset.addEventListener('click', () => { hideHint(); resetIsometric(); });
+    btnToggle.addEventListener('click', () => {
+      isPaused = !isPaused;
+      btnToggle.setAttribute('aria-pressed', String(isPaused));
+      iconPause.style.display = isPaused ? 'none' : 'block';
+      iconPlay.style.display  = isPaused ? 'block' : 'none';
+      labelToggle.textContent = isPaused ? 'Reanudar' : 'Pausar';
+    });
+
+    window.addEventListener('keydown', e => {
+      if (e.code === 'Space') { e.preventDefault(); btnToggle.click(); }
+      else if (e.key === 'r' || e.key === 'R') resetIsometric();
+      else if (e.key === 'ArrowRight') { hideHint(); switchExhibit((currentExhibit + 1) % EXHIBITS.length); }
+      else if (e.key === 'ArrowLeft')  { hideHint(); switchExhibit((currentExhibit + EXHIBITS.length - 1) % EXHIBITS.length); }
+      else if (['1', '2', '3', '4'].includes(e.key)) { hideHint(); switchExhibit(Number(e.key) - 1); }
+    });
+
+    // Ajuste de tamaño del canvas y abreviación responsiva de "Odoo · O" -> "O"
+    function resize() {
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width  = Math.max(1, Math.floor(window.innerWidth * dpr));
+      canvas.height = Math.max(1, Math.floor(window.innerHeight * dpr));
+
+      pillEl.classList.remove('compact-o');
+      if (pillEl.scrollWidth > window.innerWidth - 28) {
+        pillEl.classList.add('compact-o');
+      }
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    // Parámetros URL opcionales (?exhibit=0..3) para pruebas rápidas
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('exhibit')) {
+      const idx = Number(params.get('exhibit'));
+      if (idx >= 0 && idx < EXHIBITS.length) {
+        currentExhibit = idx;
+        fromExhibit = idx;
+        transProgress = 1.0;
+        updatePlacard(idx);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Bucle principal de animación (60 fps)
+    // -------------------------------------------------------------------------
+    let lastTimestamp = performance.now();
+
+    function frame(now) {
+      const dt = Math.min((now - lastTimestamp) * 0.001, 0.05);
+      lastTimestamp = now;
+
+      if (!isPaused) {
+        animTime += dt;
+        if (transProgress < 1.0) {
+          const duration = director.getTransitionDuration(fromExhibit, currentExhibit);
+          transProgress = Math.min(1.0, transProgress + dt / duration);
+        } else {
+          holdTimer += dt;
+          tabProgressEls[currentExhibit].style.width = `${Math.min(100, (holdTimer / HOLD_SECONDS) * 100)}%`;
+          if (holdTimer >= HOLD_SECONDS) {
+            switchExhibit((currentExhibit + 1) % EXHIBITS.length);
+          }
+        }
+      }
+
+      const damp = 1 - Math.exp(-8.5 * dt);
+      cam.azim += (cam.targetAzim - cam.azim) * damp;
+      cam.elev += (cam.targetElev - cam.elev) * damp;
+      cam.zoom += (cam.targetZoom - cam.zoom) * damp;
+
+      const elevDeg = (cam.elev * 180 / Math.PI).toFixed(1);
+      const azimDeg = ((((cam.azim * 180 / Math.PI) % 360) + 360) % 360).toFixed(1);
+      const isIso = Math.abs(cam.elev - ISO_ELEVATION) < 0.015 && Math.abs(Math.sin((cam.azim - ISO_AZIMUTH) * 0.5)) < 0.01;
+      telemetryEl.textContent = `${isIso ? 'ISO' : 'ORBIT'} · ${elevDeg}° / ${azimDeg}°`;
+
+      const floatWave = Math.sin(animTime * 1.15);
+      const dynamicItems = director.buildFrame({
+        fromExhibit,
+        currentExhibit,
+        progress: transProgress,
+        baseY: 0.56,
+        floatWave,
+        rotationY: animTime * 0.44
+      });
+
+      renderer.renderFrame({
+        dynamicItems,
+        stage,
+        cam,
+        targetY: -0.22,
+        floatWave,
+        darkTone: 0
+      });
+
+      requestAnimationFrame(frame);
+    }
+
+    requestAnimationFrame(frame);
+  })();
+  </script>
+</body>
+</html>
