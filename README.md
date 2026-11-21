@@ -15,7 +15,7 @@ katze_3D_logos/
 ├── js/
 │   ├── math3d.js                        # Matrices 3D (proyección ortográfica isométrica) y funciones de easing
 │   ├── logo-geometries.js               # Geometría 3D de Eco, Katze (con muesca circular), Odoo, morphing y pedestal
-│   ├── webgl-renderer.js                # Renderizador PBR WebGL2 (luces de estudio, sombras PCF y modo transparente)
+│   ├── webgl-renderer.js                # Renderizador PBR WebGL2 (luces de estudio, sombras PCF, granulado 3D y modo transparente)
 │   ├── choreography.js                  # Coreografía de los 4 logos y sus transiciones (trazado 3D, salida y plastilina)
 │   └── katze-logo-3d.js                 # Web Component reutilizable <katze-logo-3d> (0 dependencias)
 ├── models/
@@ -71,6 +71,7 @@ Luego abre en tu navegador:
 - **Pestañas `01 Eco` · `02 Katze` · `03 Odoo` · `04 Odoo · O` (o teclas `1`–`4` / flechas `←` `→`)**: cambiar de pieza manualmente.
 - **Botón Pausar / tecla `Espacio`**: pausar o reanudar la rotación y el carrusel automático.
 - **Botón Isométrica / doble clic / tecla `R`**: restaurar la vista isométrica exacta (`35.3° / 45.0°`).
+- **Botón Grano / tecla `G`**: despliega el panel flotante sobre la barra para elegir el **tipo de granulado** (`Sin grano`, `Risografía`, `Arcilla 3D`, `Film`), su **intensidad** (`0%`–`100%`) y el **tamaño de grano** (`0.80px`–`2.40px`). También acepta parámetros URL: `?grain=riso&grainStrength=0.65&grainScale=1.35`.
 
 ---
 
@@ -110,7 +111,7 @@ Funciona en **HTML puro, Webflow, Framer, Shopify, WordPress** y cualquier CMS.
 </model-viewer>
 ```
 
-### Forma 2: Con `<katze-logo-3d>` (0 librerías externas, fondo transparente, shader PBR exacto)
+### Forma 2: Con `<katze-logo-3d>` (0 librerías externas, fondo transparente, shader PBR con granulado)
 Copia la carpeta `js/` a tu proyecto e inserta el componente directamente en tu HTML:
 
 ```html
@@ -120,11 +121,15 @@ Copia la carpeta `js/` a tu proyecto e inserta el componente directamente en tu 
 <script src="js/choreography.js"></script>
 <script src="js/katze-logo-3d.js"></script>
 
-<!-- model puede ser: "eco" | "katze" | "odoo" | "o" | "showcase" -->
-<!-- tone puede ser: "light" (fondos claros) o "dark" (fondos oscuros) -->
+<!-- model: "eco" | "katze" | "odoo" | "o" | "showcase" -->
+<!-- tone:  "light" (fondos claros) | "dark" (fondos oscuros) -->
+<!-- grain: "riso" | "clay" | "film" | "off" -->
 <katze-logo-3d
   model="showcase"
   tone="light"
+  grain="riso"
+  grain-strength="0.65"
+  grain-scale="1.35"
   speed="0.44"
   style="width: 320px; height: 320px;">
 </katze-logo-3d>
@@ -133,11 +138,34 @@ Copia la carpeta `js/` a tu proyecto e inserta el componente directamente en tu 
 Atributos opcionales de `<katze-logo-3d>`:
 - `model`: `"eco"`, `"katze"`, `"odoo"`, `"o"` o `"showcase"` (animación completa).
 - `tone`: `"light"` (por defecto) o `"dark"` (añade luz de contorno para fondos oscuros).
+- `grain`: estilo del efecto granulado en shader WebGL2 — `"riso"` (por defecto, puntillismo editorial en sombras y medios tonos), `"clay"` (moteado mineral 3D anclado al objeto), `"film"` (grano analógico animado a 12 fps) u `"off"` (acabado cerámico liso).
+- `grain-strength`: intensidad del granulado entre `0` y `1` (por defecto `0.65`).
+- `grain-scale`: tamaño de punto del grano entre `0.8` y `2.4` (por defecto `1.35`).
 - `speed`: velocidad de giro en rad/s (por defecto `0.44`; `0` para estático).
 - `float`: intensidad de flotación (por defecto `1`; `0` para desactivar).
 - `hold`: segundos de pausa por logo cuando `model="showcase"` (por defecto `4.5`).
 - `interactive`: `"true"` (por defecto) o `"false"`.
 - `paused`: agrega el atributo para iniciar pausado.
+
+#### Uso directo del efecto granulado con `webgl-renderer.js`
+Si integras `Katze3D.createRenderer(canvas)` directamente en lugar de `<katze-logo-3d>`, pasa el objeto `grain` en cada cuadro de `renderFrame`:
+
+```js
+renderer.renderFrame({
+  dynamicItems,
+  stage,
+  cam,
+  targetY: 0,
+  floatWave,
+  darkTone: 0,
+  grain: {
+    mode: 'riso',    // 'riso' | 'clay' | 'film' | 'off'
+    strength: 0.65,  // 0.0 .. 1.0
+    scale: 1.35,     // 0.8 .. 2.4
+    time: animTime   // usado para animar el modo 'film' a 12 fps
+  }
+});
+```
 
 ### Forma 3: En React / Next.js con Three.js (`@react-three/fiber`)
 

@@ -13,13 +13,13 @@ Este documento resume la arquitectura, los archivos y los contratos exactos de `
 | `models/odoo.glb` | Logotipo **Odoo** completo (sin base). | 4 nodos: `Odoo_O_Purple` (`#714B67`), `Odoo_D_Gray`, `Odoo_O2_Gray`, `Odoo_O3_Gray` (`#8F8F8F`). |
 | `models/odoo-o.glb` | Isotipo **O** de Odoo (sin base, `#714B67`). | Nodo raíz `OdooORoot`, grosor escultórico proporcional. |
 | `models/katze-showcase-animated.glb` | Archivo **glTF 2.0 completo con animación** (`KatzeFullShowcase`, loop continuo de `24.0 s`). | Core glTF 2.0 puro (sin extensiones propietarias): incluye 24 segmentos progresivos de Katze, salida en cascada de `d`, `o`, `o`, y 2 *morph targets* en `Odoo_O_Hero` para el moldeado tipo plastilina hacia el diamante de Eco. |
-| `index.html` | Página de exhibición 3D exacta con pedestal minimalista, sombras PCF 2048×2048 y barra responsiva (`01 Eco`, `02 Katze`, `03 Odoo`, `04 Odoo · O` / `O`). | Funciona directo vía `file://` o HTTP sin build step. |
-| `implementacion.html` | Página interactiva de referencia que muestra los 4 modelos individuales y el showcase completo sobre fondos claro, oscuro y alfa, con snippets copiables. | Funciona directo vía `file://` o HTTP. |
+| `index.html` | Página de exhibición 3D exacta con pedestal minimalista, sombras PCF 2048×2048, barra responsiva (`01 Eco`, `02 Katze`, `03 Odoo`, `04 Odoo · O` / `O`) y menú desplegable flotante de **Grano** (tipo, intensidad y tamaño). | Funciona directo vía `file://` o HTTP sin build step. Parámetros URL: `?exhibit=0..3&grain=riso\|clay\|film\|off&grainStrength=0.65&grainScale=1.35`. |
+| `implementacion.html` | Página interactiva de referencia que muestra los 4 modelos individuales y el showcase completo sobre fondos claro, oscuro y alfa, con controles en vivo de granulado y snippets copiables. | Funciona directo vía `file://` o HTTP. |
 | `js/math3d.js` | Matrices 4×4 column-major (`Katze3D.Math3D`), ángulos isométricos (`ISO_ELEVATION = asin(1/sqrt(3))`, `ISO_AZIMUTH = PI/4`) y curvas `Katze3D.Easing`. | Sin dependencias, namespace global `window.Katze3D`. |
 | `js/logo-geometries.js` | Constructores WebGL2 de Eco, Katze (muesca circular), Odoo (`o`, `d`), motor de morphing tipo plastilina (`createClayMorphEngine`) y pedestal (`buildExhibitionStage`). | Reutilizado por `index.html` y por `<katze-logo-3d>`. |
-| `js/webgl-renderer.js` | Renderizador PBR Cook-Torrance GGX en WebGL2 (`Katze3D.createRenderer`). Soporta `transparent: false` (exhibición con sombras) y `transparent: true` (fondo transparente + `darkTone`). | Shaders GLSL ES 3.00 embebidos; sin texturas externas. |
+| `js/webgl-renderer.js` | Renderizador PBR Cook-Torrance GGX en WebGL2 (`Katze3D.createRenderer`) con efecto **granulado editorial 3D** integrado (`riso`, `clay`, `film`, `off`). Soporta `transparent: false` (exhibición con sombras) y `transparent: true` (fondo transparente + `darkTone`). | Shaders GLSL ES 3.00 embebidos; sin texturas externas. Pasar `grain: { mode, strength, scale, time }` a `renderFrame()`. |
 | `js/choreography.js` | Máquina de estados de animación (`Katze3D.createDirector`) con las 4 transiciones coreografiadas (incluido trazado progresivo de Katze, salida de `d,o,o` y morphing de plastilina en tiempo real). | Fuente única de verdad para la animación WebGL2. |
-| `js/katze-logo-3d.js` | Custom Element `<katze-logo-3d>` sin base, fondo transparente, `ResizeObserver` e `IntersectionObserver`. | Atributos: `model`, `tone`, `speed`, `float`, `zoom`, `hold`, `interactive`, `paused`. |
+| `js/katze-logo-3d.js` | Custom Element `<katze-logo-3d>` sin base, fondo transparente, `ResizeObserver` e `IntersectionObserver`. | Atributos: `model`, `tone`, `grain`, `grain-strength`, `grain-scale`, `speed`, `float`, `zoom`, `hold`, `interactive`, `paused`. |
 
 ---
 
@@ -29,13 +29,22 @@ Este documento resume la arquitectura, los archivos y los contratos exactos de `
    - **Eco / Katze**: Negro mate escultórico (acabado cerámico/piedra, `roughness ~ 0.48`, biseles suaves que captan reflejos de estudio).
    - **Odoo Primary (`o`)**: `#714B67` (`RGB(113, 75, 103)`).
    - **Odoo Gray (`d`, `o`, `o`)**: `#8F8F8F` (`RGB(143, 143, 143)`).
-2. **Proyección isométrica**:
+2. **Efecto granulado 3D (shader WebGL2 sin texturas)**:
+   - Implementado nativamente en el *fragment shader* de `js/webgl-renderer.js` (`applyEditorialGrain`), por lo que respeta al 100% la transparencia del fondo en `<katze-logo-3d>`.
+   - **Modos (`grain`)**:
+     - `riso` *(por defecto)*: puntillismo / grano risográfico concentrado en sombras y medios tonos.
+     - `clay`: moteado mineral y micro-relieve anclado a las coordenadas locales 3D del modelo.
+     - `film`: grano analógico fino animado a ~12 fps estilo *stop-motion*.
+     - `off`: acabado cerámico mate liso sin grano extra.
+   - **Ajustes**: `grain-strength` (`0`..`1`, defecto `0.65`) y `grain-scale` (`0.8`..`2.4`, defecto `1.35`).
+   - En integraciones directas con `Katze3D.createRenderer`, pasar `grain: { mode, strength, scale, time }` en `renderFrame(...)`.
+3. **Proyección isométrica**:
    - Usar cámara **ortográfica** en elevación `35.264°` (`Math.asin(1 / Math.sqrt(3))`) y azimut `45°` (`Math.PI / 4`).
    - En `<model-viewer>`, aproximar la vista isométrica con `camera-orbit="45deg 54.7deg 2.5m"` y `field-of-view="20deg"` (o menor).
-3. **Cuándo elegir cada método de integración**:
-   - **Opción A — Web Component `<katze-logo-3d>` (`js/*.js`)**: Elegir cuando se quiera **0 dependencias externas**, **fondo 100% transparente**, **morphing tipo plastilina en tiempo real con cambio gradual de color** (`#714B67 → negro mate`) y **trazado continuo exacto de Katze** con el mismo shader PBR de la exhibición.
+4. **Cuándo elegir cada método de integración**:
+   - **Opción A — Web Component `<katze-logo-3d>` (`js/*.js`)**: Elegir cuando se quiera **0 dependencias externas**, **fondo 100% transparente**, **efecto granulado 3D (`riso | clay | film`)**, **morphing tipo plastilina en tiempo real con cambio gradual de color** (`#714B67 → negro mate`) y **trazado continuo exacto de Katze** con el mismo shader PBR de la exhibición.
    - **Opción B — `.glb` + `<model-viewer>` o Three.js / React Three Fiber**: Elegir cuando el proyecto ya use Three.js/R3F, Webflow, Framer, Shopify o cuando se requiera un único archivo 3D estándar (`models/katze-showcase-animated.glb` con el clip `KatzeFullShowcase` o cualquiera de los 4 `.glb` individuales).
-4. **Legibilidad y minimalismo**:
+5. **Legibilidad y minimalismo**:
    - Mantener el código claro, plano y fácil de leer; evitar abstracciones innecesarias o dependencias pesadas si el proyecto destino no las requiere.
    - No incluir el pedestal cuando se integre el logo en otras páginas; mantener el fondo transparente (`alpha: true` / `background: transparent`).
    - En contenedores estrechos o móviles, asegurarse de pausar el render fuera de viewport (`IntersectionObserver`) y ajustar la escala ortográfica para que el logo no se recorte horizontalmente.
@@ -70,13 +79,15 @@ Contexto del repositorio fuente (`katze_3D_logos`):
   - `models/katze-showcase-animated.glb` (animación completa en loop de 24 s, clip llamado `KatzeFullShowcase`, con morph targets de plastilina y trazado progresivo)
 - Web Component sin dependencias y con fondo transparente:
   - Archivos requeridos en orden: `js/math3d.js`, `js/logo-geometries.js`, `js/webgl-renderer.js`, `js/choreography.js`, `js/katze-logo-3d.js`
-  - Etiqueta: `<katze-logo-3d model="showcase" tone="light" speed="0.44"></katze-logo-3d>` (atributos `model`: `eco | katze | odoo | o | showcase`; `tone`: `light | dark`).
+  - Etiqueta: `<katze-logo-3d model="showcase" tone="light" grain="riso" grain-strength="0.65" grain-scale="1.35" speed="0.44"></katze-logo-3d>`
+  - Atributos principales: `model` (`eco | katze | odoo | o | showcase`), `tone` (`light | dark`), `grain` (`riso | clay | film | off`), `grain-strength` (`0..1`), `grain-scale` (`0.8..2.4`).
 
 Requisitos de implementación:
 1. Mostrar [ELEGIR: "la animación completa de transformación (showcase)" / "solo el logo Eco" / "solo el logo Katze" / "solo Odoo" / "solo la O"] sin pedestal y con fondo 100% transparente para que se integre de forma natural sobre mi fondo [ELEGIR: "claro" / "oscuro"].
-2. Mantener la vista isométrica real (proyección ortográfica a 35.3° / 45°), rotación suave y flotación continua.
-3. Preferir el método más limpio para mi stack:
-   - Si mi proyecto es HTML/JS/Astro/Vue/Webflow o no usa Three.js: integrar el Web Component `<katze-logo-3d>` (0 dependencias, reproduce el morphing de plastilina con cambio suave de color y el trazado 3D exacto) o `<model-viewer>` con `models/katze-showcase-animated.glb`.
-   - Si mi proyecto ya usa React Three Fiber / Three.js: cargar `models/katze-showcase-animated.glb` con `useGLTF` + `useAnimations` reproduciendo `KatzeFullShowcase` en un `<Canvas orthographic gl={{ alpha: true }}>` con iluminación de estudio.
-4. Asegurar que sea responsivo en móvil y desktop (sin recortar el modelo), pausar el renderizado cuando no esté visible en pantalla, y escribir código simple, claro y fácil de leer.
+2. Aplicar el efecto granulado 3D en modo [ELEGIR: "riso (risografía en sombras)" / "clay (arcilla 3D)" / "film (stop-motion)" / "off (sin grano)"] con intensidad `[0.65]` y tamaño `[1.35]`.
+3. Mantener la vista isométrica real (proyección ortográfica a 35.3° / 45°), rotación suave y flotación continua.
+4. Preferir el método más limpio para mi stack:
+   - Si mi proyecto es HTML/JS/Astro/Vue/Webflow o quiero el efecto granulado editorial y morphing exacto sin dependencias: integrar el Web Component `<katze-logo-3d>`.
+   - Si mi proyecto ya usa React Three Fiber / Three.js: cargar `models/katze-showcase-animated.glb` con `useGLTF` + `useAnimations` reproduciendo `KatzeFullShowcase` en un `<Canvas orthographic gl={{ alpha: true }}>` con iluminación de estudio (opcionalmente añadiendo postprocesado de film/risograph grain si se desea el granulado).
+5. Asegurar que sea responsivo en móvil y desktop (sin recortar el modelo), pausar el renderizado cuando no esté visible en pantalla, y escribir código simple, claro y fácil de leer.
 ```

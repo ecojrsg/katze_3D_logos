@@ -272,6 +272,87 @@
       line-height: 1.65;
       color: #1c1b19;
     }
+
+    /* Barra de ajustes en vivo del efecto granulado */
+    .grain-toolbar {
+      background: #ffffff;
+      border: 1px solid rgba(28, 27, 25, 0.09);
+      border-radius: 14px;
+      padding: 12px 16px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .grain-toolbar-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+    .grain-label {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(28, 27, 25, 0.48);
+    }
+    .grain-slider-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 16px;
+    }
+    .grain-slider {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: rgba(28, 27, 25, 0.72);
+    }
+    .grain-slider input[type="range"] {
+      width: 110px;
+      accent-color: #1c1b19;
+      cursor: pointer;
+    }
+    .grain-readout {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      color: rgba(28, 27, 25, 0.55);
+      min-width: 40px;
+    }
+
+    /* Guía rápida del efecto granulado */
+    .grain-guide {
+      background: #ffffff;
+      border: 1px solid rgba(28, 27, 25, 0.09);
+      border-radius: 16px;
+      padding: 20px 22px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+    @media (max-width: 820px) { .grain-guide { grid-template-columns: 1fr; } }
+    .grain-guide-item {
+      background: #faf8f4;
+      border: 1px solid rgba(28, 27, 25, 0.06);
+      border-radius: 12px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .grain-guide-item code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 12px;
+      font-weight: 600;
+      color: #1c1b19;
+    }
+    .grain-guide-item p {
+      font-size: 12.5px;
+      color: rgba(28, 27, 25, 0.66);
+    }
   </style>
 </head>
 <body data-surface="light">
@@ -291,6 +372,31 @@
         <a class="nav-link" href="index.html">← Ver exhibición</a>
       </div>
     </header>
+
+    <!-- Barra interactiva de efecto granulado (aplica en vivo a los 5 visores y al código) -->
+    <div class="grain-toolbar" aria-label="Controles en vivo del efecto granulado">
+      <div class="grain-toolbar-group">
+        <span class="grain-label">Granulado 3D</span>
+        <div class="surface-switch" role="group" aria-label="Tipo de granulado">
+          <button class="surface-btn grain-btn" data-grain="off" type="button">Sin grano</button>
+          <button class="surface-btn grain-btn active" data-grain="riso" type="button">Risografía</button>
+          <button class="surface-btn grain-btn" data-grain="clay" type="button">Arcilla 3D</button>
+          <button class="surface-btn grain-btn" data-grain="film" type="button">Film</button>
+        </div>
+      </div>
+      <div class="grain-slider-group">
+        <label class="grain-slider">
+          <span>Intensidad</span>
+          <input id="impl-grain-strength" type="range" min="0" max="100" value="65" />
+          <span class="grain-readout" id="impl-grain-strength-val">65%</span>
+        </label>
+        <label class="grain-slider">
+          <span>Tamaño</span>
+          <input id="impl-grain-scale" type="range" min="80" max="240" value="135" />
+          <span class="grain-readout" id="impl-grain-scale-val">1.35px</span>
+        </label>
+      </div>
+    </div>
 
     <!-- 1. Los 4 modelos individuales -->
     <section>
@@ -401,6 +507,36 @@
         <pre id="code-output"></pre>
       </div>
     </section>
+
+    <!-- 4. Cómo implementar y personalizar el efecto granulado -->
+    <section>
+      <h2 class="section-title">4. Cómo implementar el efecto granulado 3D</h2>
+      <div class="grain-guide">
+        <div class="grain-guide-item">
+          <code>grain="riso | clay | film | off"</code>
+          <p>
+            Elige el estilo del shader en <code>&lt;katze-logo-3d&gt;</code>:
+            <strong>riso</strong> (puntillismo editorial en sombras y medios tonos),
+            <strong>clay</strong> (moteado mineral anclado a la geometría 3D),
+            <strong>film</strong> (grano analógico animado a 12 fps) u <strong>off</strong> (cerámico liso).
+          </p>
+        </div>
+        <div class="grain-guide-item">
+          <code>grain-strength="0.65"</code>
+          <p>
+            Controla la intensidad del granulado entre <code>0</code> y <code>1</code> (por defecto <code>0.65</code>).
+            Puedes ajustarlo en vivo con los controles de arriba y copiar el bloque exacto en la pestaña <code>&lt;katze-logo-3d&gt;</code>.
+          </p>
+        </div>
+        <div class="grain-guide-item">
+          <code>grain-scale="1.35"</code>
+          <p>
+            Define el tamaño de punto del grano entre <code>0.80</code> (muy fino) y <code>2.40</code> (más marcado).
+            Si usas <code>webgl-renderer.js</code> directo, pásalo en <code>renderFrame({ grain: { mode, strength, scale, time } })</code>.
+          </p>
+        </div>
+      </div>
+    </section>
   </div>
 
   <!-- Scripts locales del componente -->
@@ -422,14 +558,22 @@
       showcase: 'models/katze-showcase-animated.glb'
     };
 
-    const codeOutput  = document.getElementById('code-output');
-    const modelSelect = document.getElementById('model-select');
-    const copyBtn     = document.getElementById('btn-copy');
-    const stackTabs   = Array.from(document.querySelectorAll('.tab'));
-    const surfaceBtns = Array.from(document.querySelectorAll('.surface-btn'));
-    const allWidgets  = Array.from(document.querySelectorAll('katze-logo-3d'));
+    const codeOutput       = document.getElementById('code-output');
+    const modelSelect      = document.getElementById('model-select');
+    const copyBtn          = document.getElementById('btn-copy');
+    const stackTabs        = Array.from(document.querySelectorAll('.tab'));
+    const surfaceBtns      = Array.from(document.querySelectorAll('[data-surface]'));
+    const grainBtns        = Array.from(document.querySelectorAll('[data-grain]'));
+    const grainStrengthIn  = document.getElementById('impl-grain-strength');
+    const grainScaleIn     = document.getElementById('impl-grain-scale');
+    const grainStrengthVal = document.getElementById('impl-grain-strength-val');
+    const grainScaleVal    = document.getElementById('impl-grain-scale-val');
+    const allWidgets       = Array.from(document.querySelectorAll('katze-logo-3d'));
 
     let currentStack = 'mv';
+    let currentGrain = 'riso';
+    let currentGrainStrength = 0.65;
+    let currentGrainScale = 1.35;
 
     function buildSnippet(stack, modelKey) {
       const file = FILE_MAP[modelKey];
@@ -455,17 +599,21 @@ ${animAttrs}
       }
 
       if (stack === 'wc') {
-        return `<!-- Cero librerías externas · Fondo 100% transparente · Shader PBR exacto -->
+        const grainAttrs = currentGrain === 'off'
+          ? '  grain="off"'
+          : `  grain="${currentGrain}"\n  grain-strength="${currentGrainStrength.toFixed(2)}"\n  grain-scale="${currentGrainScale.toFixed(2)}"`;
+        return `<!-- Cero librerías externas · Fondo 100% transparente · Shader PBR con grano editorial -->
 <script src="js/math3d.js"><\/script>
 <script src="js/logo-geometries.js"><\/script>
 <script src="js/webgl-renderer.js"><\/script>
 <script src="js/choreography.js"><\/script>
 <script src="js/katze-logo-3d.js"><\/script>
 
-<!-- Usa tone="light" en fondos claros o tone="dark" en fondos oscuros -->
+<!-- Usa tone="light|dark", grain="riso|clay|film|off", grain-strength="0..1" y grain-scale="0.8..2.4" -->
 <katze-logo-3d
   model="${modelKey}"
   tone="light"
+${grainAttrs}
   speed="0.44"
   style="width: 320px; height: 320px;">
 </katze-logo-3d>`;
@@ -532,6 +680,18 @@ export function Logo3D() {
       codeOutput.textContent = buildSnippet(currentStack, modelSelect.value);
     }
 
+    function syncGrain() {
+      grainBtns.forEach(b => b.classList.toggle('active', b.dataset.grain === currentGrain));
+      grainStrengthVal.textContent = `${Math.round(currentGrainStrength * 100)}%`;
+      grainScaleVal.textContent = `${currentGrainScale.toFixed(2)}px`;
+      allWidgets.forEach(w => {
+        w.setAttribute('grain', currentGrain);
+        w.setAttribute('grain-strength', currentGrainStrength.toFixed(2));
+        w.setAttribute('grain-scale', currentGrainScale.toFixed(2));
+      });
+      updateCode();
+    }
+
     stackTabs.forEach(tab => {
       tab.addEventListener('click', () => {
         currentStack = tab.dataset.stack;
@@ -541,7 +701,7 @@ export function Logo3D() {
     });
 
     modelSelect.addEventListener('change', updateCode);
-    updateCode();
+    syncGrain();
 
     copyBtn.addEventListener('click', async () => {
       try {
@@ -559,6 +719,26 @@ export function Logo3D() {
         surfaceBtns.forEach(b => b.classList.toggle('active', b === btn));
         allWidgets.forEach(w => w.setAttribute('tone', surface === 'dark' ? 'dark' : 'light'));
       });
+    });
+
+    // Cambio de tipo, intensidad y tamaño de granulado en vivo sobre todos los modelos
+    grainBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentGrain = btn.dataset.grain;
+        syncGrain();
+      });
+    });
+
+    grainStrengthIn.addEventListener('input', () => {
+      currentGrainStrength = Number(grainStrengthIn.value) / 100;
+      if (currentGrain === 'off' && currentGrainStrength > 0) currentGrain = 'riso';
+      syncGrain();
+    });
+
+    grainScaleIn.addEventListener('input', () => {
+      currentGrainScale = Number(grainScaleIn.value) / 100;
+      if (currentGrain === 'off') currentGrain = 'riso';
+      syncGrain();
     });
   })();
   </script>

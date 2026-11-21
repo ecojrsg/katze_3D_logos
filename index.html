@@ -208,6 +208,7 @@
       transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
     }
     .btn:hover { background: rgba(28, 27, 25, 0.06); color: #141312; }
+    .btn.active { background: rgba(28, 27, 25, 0.10); color: #141312; }
     .btn:active { transform: scale(0.96); }
     .btn svg { width: 14px; height: 14px; flex-shrink: 0; }
 
@@ -217,6 +218,96 @@
       background: rgba(28, 27, 25, 0.10);
       margin: 0 3px;
       flex-shrink: 0;
+    }
+
+    /* Menú desplegable flotante de granulado (arriba de la barra principal) */
+    .grain-popover {
+      width: min(360px, calc(100vw - 28px));
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: rgba(248, 246, 241, 0.90);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(28, 27, 25, 0.095);
+      box-shadow:
+        0 14px 36px -12px rgba(28, 27, 25, 0.15),
+        0 3px 8px rgba(28, 27, 25, 0.05),
+        inset 0 1px 0 rgba(255, 255, 255, 0.78);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+      pointer-events: none;
+      visibility: hidden;
+      transition: opacity 0.18s ease, transform 0.2s ease, visibility 0.2s ease;
+    }
+    .grain-popover.open {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+      pointer-events: auto;
+      visibility: visible;
+    }
+    .grain-popover-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(28, 27, 25, 0.48);
+    }
+    .grain-modes {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px;
+      padding: 3px;
+      border-radius: 999px;
+      background: rgba(28, 27, 25, 0.055);
+    }
+    .grain-mode-btn {
+      appearance: none;
+      border: none;
+      background: transparent;
+      color: rgba(28, 27, 25, 0.66);
+      font-family: inherit;
+      font-size: 11.5px;
+      font-weight: 500;
+      padding: 6px 6px;
+      border-radius: 999px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background-color 0.18s ease, color 0.18s ease;
+    }
+    .grain-mode-btn:hover { color: #141312; }
+    .grain-mode-btn.active { background: #1c1b19; color: #f7f4ee; }
+    .grain-sliders {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: opacity 0.2s ease;
+    }
+    .grain-sliders.dimmed { opacity: 0.45; }
+    .grain-slider-row {
+      display: grid;
+      grid-template-columns: 76px 1fr 44px;
+      align-items: center;
+      gap: 10px;
+      font-size: 11.5px;
+      color: rgba(28, 27, 25, 0.70);
+    }
+    .grain-slider-row input[type="range"] {
+      width: 100%;
+      accent-color: #1c1b19;
+      cursor: pointer;
+      height: 4px;
+    }
+    .grain-val {
+      text-align: right;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 11px;
+      color: rgba(28, 27, 25, 0.56);
     }
 
     .fallback {
@@ -268,7 +359,32 @@
     <a class="impl-link" href="implementacion.html">Cómo implementar →</a>
   </div>
 
-  <div class="controls-wrap">
+  <div class="controls-wrap" id="controls-wrap">
+    <div class="grain-popover" id="grain-popover" role="dialog" aria-label="Ajustes de efecto granulado">
+      <div class="grain-popover-head">
+        <span>Efecto granulado</span>
+        <span id="grain-summary">RISO · 65% · 1.35px</span>
+      </div>
+      <div class="grain-modes" role="group" aria-label="Tipo de grano">
+        <button class="grain-mode-btn" data-grain-mode="off" type="button">Sin grano</button>
+        <button class="grain-mode-btn active" data-grain-mode="riso" type="button">Risografía</button>
+        <button class="grain-mode-btn" data-grain-mode="clay" type="button">Arcilla 3D</button>
+        <button class="grain-mode-btn" data-grain-mode="film" type="button">Film</button>
+      </div>
+      <div class="grain-sliders" id="grain-sliders">
+        <label class="grain-slider-row">
+          <span>Intensidad</span>
+          <input id="grain-strength" type="range" min="0" max="100" value="65" />
+          <span class="grain-val" id="grain-strength-val">65%</span>
+        </label>
+        <label class="grain-slider-row">
+          <span>Tamaño</span>
+          <input id="grain-scale" type="range" min="80" max="240" value="135" />
+          <span class="grain-val" id="grain-scale-val">1.35px</span>
+        </label>
+      </div>
+    </div>
+
     <span class="hint" id="hint">Arrastra para inspeccionar · Rueda para zoom · Flechas para cambiar</span>
     <nav class="pill" id="pill" aria-label="Controles de exhibición">
       <div class="exhibit-tabs" role="tablist" aria-label="Logos en exhibición">
@@ -308,6 +424,17 @@
           <path d="M12 12L4 7.5"></path>
         </svg>
         <span class="btn-label">Isométrica</span>
+      </button>
+      <button class="btn" id="btn-grain" type="button" aria-expanded="false" aria-controls="grain-popover" title="Ajustar efecto granulado (G)">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <circle cx="6.5" cy="7.5" r="1.7"></circle>
+          <circle cx="13.5" cy="6.5" r="1.3"></circle>
+          <circle cx="18" cy="11" r="1.6"></circle>
+          <circle cx="9.5" cy="13" r="1.8"></circle>
+          <circle cx="5.5" cy="17.5" r="1.4"></circle>
+          <circle cx="15" cy="17.5" r="1.7"></circle>
+        </svg>
+        <span class="btn-label" id="label-grain">Grano</span>
       </button>
     </nav>
   </div>
@@ -461,6 +588,76 @@
       cam.targetZoom = Math.max(1.6, Math.min(4.7, cam.targetZoom * (1 + e.deltaY * 0.0008)));
     }, { passive: false });
 
+    // -------------------------------------------------------------------------
+    // Menú desplegable de efecto granulado (tipo, intensidad y tamaño)
+    // -------------------------------------------------------------------------
+    const GRAIN_ORDER = ['off', 'riso', 'clay', 'film'];
+    const GRAIN_SHORT = { off: 'OFF', riso: 'RISO', clay: 'ARCILLA', film: 'FILM' };
+    const grainState = { mode: 'riso', strength: 0.65, scale: 1.35 };
+
+    const controlsWrap     = document.getElementById('controls-wrap');
+    const grainPopover     = document.getElementById('grain-popover');
+    const grainSummary     = document.getElementById('grain-summary');
+    const grainSliders     = document.getElementById('grain-sliders');
+    const grainStrengthIn  = document.getElementById('grain-strength');
+    const grainScaleIn     = document.getElementById('grain-scale');
+    const grainStrengthVal = document.getElementById('grain-strength-val');
+    const grainScaleVal    = document.getElementById('grain-scale-val');
+    const grainModeBtns    = Array.from(document.querySelectorAll('[data-grain-mode]'));
+    const btnGrain         = document.getElementById('btn-grain');
+
+    function syncGrainUI() {
+      const isOff = grainState.mode === 'off';
+      const pct = Math.round(grainState.strength * 100);
+      grainModeBtns.forEach(b => b.classList.toggle('active', b.dataset.grainMode === grainState.mode));
+      grainSliders.classList.toggle('dimmed', isOff);
+      grainStrengthIn.value = String(pct);
+      grainScaleIn.value = String(Math.round(grainState.scale * 100));
+      grainStrengthVal.textContent = `${pct}%`;
+      grainScaleVal.textContent = `${grainState.scale.toFixed(2)}px`;
+      grainSummary.textContent = isOff
+        ? 'DESACTIVADO'
+        : `${GRAIN_SHORT[grainState.mode]} · ${pct}% · ${grainState.scale.toFixed(2)}px`;
+    }
+
+    function setGrainPopoverOpen(open) {
+      grainPopover.classList.toggle('open', open);
+      btnGrain.classList.toggle('active', open);
+      btnGrain.setAttribute('aria-expanded', String(open));
+    }
+
+    btnGrain.addEventListener('click', () => {
+      hideHint();
+      setGrainPopoverOpen(!grainPopover.classList.contains('open'));
+    });
+
+    grainModeBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        grainState.mode = btn.dataset.grainMode;
+        syncGrainUI();
+      });
+    });
+
+    grainStrengthIn.addEventListener('input', () => {
+      grainState.strength = Number(grainStrengthIn.value) / 100;
+      if (grainState.mode === 'off' && grainState.strength > 0) grainState.mode = 'riso';
+      syncGrainUI();
+    });
+
+    grainScaleIn.addEventListener('input', () => {
+      grainState.scale = Number(grainScaleIn.value) / 100;
+      if (grainState.mode === 'off') grainState.mode = 'riso';
+      syncGrainUI();
+    });
+
+    document.addEventListener('pointerdown', e => {
+      if (grainPopover.classList.contains('open') && !controlsWrap.contains(e.target)) {
+        setGrainPopoverOpen(false);
+      }
+    });
+
+    syncGrainUI();
+
     btnReset.addEventListener('click', () => { hideHint(); resetIsometric(); });
     btnToggle.addEventListener('click', () => {
       isPaused = !isPaused;
@@ -471,8 +668,14 @@
     });
 
     window.addEventListener('keydown', e => {
-      if (e.code === 'Space') { e.preventDefault(); btnToggle.click(); }
+      if (e.key === 'Escape' && grainPopover.classList.contains('open')) {
+        setGrainPopoverOpen(false);
+      } else if (e.code === 'Space') { e.preventDefault(); btnToggle.click(); }
       else if (e.key === 'r' || e.key === 'R') resetIsometric();
+      else if (e.key === 'g' || e.key === 'G') {
+        hideHint();
+        setGrainPopoverOpen(!grainPopover.classList.contains('open'));
+      }
       else if (e.key === 'ArrowRight') { hideHint(); switchExhibit((currentExhibit + 1) % EXHIBITS.length); }
       else if (e.key === 'ArrowLeft')  { hideHint(); switchExhibit((currentExhibit + EXHIBITS.length - 1) % EXHIBITS.length); }
       else if (['1', '2', '3', '4'].includes(e.key)) { hideHint(); switchExhibit(Number(e.key) - 1); }
@@ -492,7 +695,7 @@
     window.addEventListener('resize', resize);
     resize();
 
-    // Parámetros URL opcionales (?exhibit=0..3) para pruebas rápidas
+    // Parámetros URL opcionales (?exhibit=0..3&grain=riso|clay|film|off&grainStrength=0.65&grainScale=1.35)
     const params = new URLSearchParams(window.location.search);
     if (params.has('exhibit')) {
       const idx = Number(params.get('exhibit'));
@@ -503,6 +706,19 @@
         updatePlacard(idx);
       }
     }
+    if (params.has('grain')) {
+      const mode = params.get('grain').toLowerCase();
+      if (GRAIN_ORDER.includes(mode)) grainState.mode = mode;
+    }
+    if (params.has('grainStrength')) {
+      const s = parseFloat(params.get('grainStrength'));
+      if (Number.isFinite(s)) grainState.strength = Math.max(0, Math.min(1, s));
+    }
+    if (params.has('grainScale')) {
+      const sc = parseFloat(params.get('grainScale'));
+      if (Number.isFinite(sc)) grainState.scale = Math.max(0.8, Math.min(2.4, sc));
+    }
+    syncGrainUI();
 
     // -------------------------------------------------------------------------
     // Bucle principal de animación (60 fps)
@@ -553,7 +769,13 @@
         cam,
         targetY: -0.22,
         floatWave,
-        darkTone: 0
+        darkTone: 0,
+        grain: {
+          mode: grainState.mode,
+          strength: grainState.strength,
+          scale: grainState.scale,
+          time: animTime
+        }
       });
 
       requestAnimationFrame(frame);

@@ -65,6 +65,10 @@
   uniform float uDarkTone;     // 1.0 para fondos oscuros (realza el brillo de contorno)
   uniform vec3 uBgColor;
   uniform sampler2D uShadowMap;
+  uniform int uGrainMode;       // 0 = off, 1 = risografía, 2 = arcilla 3D, 3 = film stop-motion
+  uniform float uGrainStrength; // 0.0 .. 1.0
+  uniform float uGrainScale;    // tamaño de grano en píxeles (ej. 1.35)
+  uniform float uTime;
 
   out vec4 fragColor;
 
@@ -87,6 +91,70 @@
           mix(hash31(i + vec3(0,1,1)), hash31(i + vec3(1,1,1)), f.x), f.y),
       f.z
     );
+  }
+
+  // Ruido de pantalla limpio (hash 2D + Interleaved Gradient Noise) para grano editorial
+  float hash21(vec2 p) {
+    vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+    p3 += dot(p3, p3.yzx + 33.33);
+    return fract((p3.x + p3.y) * p3.z);
+  }
+
+  float ign(vec2 p) {
+    return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
+  }
+
+  vec3 applyEditorialGrain(vec3 srgb, vec3 localPos, float NoL, float shadowVal, int matType) {
+    if (uGrainMode == 0 || uGrainStrength <= 0.001) return srgb;
+
+    float s = uGrainStrength;
+    vec2 cell = floor(gl_FragCoord.xy / max(uGrainScale, 0.5));
+    float luma = dot(srgb, vec3(0.299, 0.587, 0.114));
+
+    if (uGrainMode == 1) {
+      // Risografía / sombra granulada (estilo editorial): concentra puntillismo en sombras y medios tonos
+      float gFine = hash21(cell + vec2(17.1, 31.7));
+      float gIgn  = ign(cell);
+      float grain = (gFine * 0.65 + gIgn * 0.35) - 0.5;
+      float shadeMask = 1.0 - smoothstep(0.08, 0.82, NoL * shadowVal);
+
+      if (matType == 0) {
+        float darkBoost = mix(1.45, 0.95, smoothstep(0.06, 0.45, luma));
+        float amp = s * 0.18 * (0.45 + 0.55 * shadeMask) * darkBoost;
+        float stipple = smoothstep(0.35, 0.68, gFine + (NoL * shadowVal - 0.45) * 0.65);
+        vec3 tint = mix(vec3(0.95, 0.93, 0.90), vec3(1.02, 1.0, 0.97), gIgn);
+        srgb += grain * amp * tint;
+        srgb = mix(srgb, srgb * (0.86 + 0.24 * stipple), s * 0.52 * shadeMask);
+      } else {
+        float floorShadow = 1.0 - shadowVal;
+        srgb += vec3(grain * s * (0.045 + 0.10 * floorShadow));
+      }
+      return clamp(srgb, 0.0, 1.0);
+    }
+
+    if (uGrainMode == 2) {
+      // Arcilla / piedra 3D: moteado mineral anclado a la geometría que gira con el modelo
+      float freq = mix(165.0, 70.0, clamp((uGrainScale - 0.8) / 1.8, 0.0, 1.0));
+      float n1 = noise3(localPos * freq);
+      float n2 = noise3(localPos * (freq * 2.15) + vec3(19.3, 7.1, 43.2));
+      float speckle = (n1 * 0.58 + n2 * 0.42) - 0.5 + (hash21(cell) - 0.5) * 0.175;
+
+      if (matType == 0) {
+        float darkBoost = mix(1.55, 1.05, smoothstep(0.06, 0.42, luma));
+        float fleck = step(0.84, n2) * 0.055 * s;
+        srgb += vec3(speckle * s * 0.20 * darkBoost) + vec3(fleck * 0.85, fleck * 0.83, fleck * 0.79);
+      } else {
+        srgb += vec3((hash21(cell) - 0.5) * s * 0.045);
+      }
+      return clamp(srgb, 0.0, 1.0);
+    }
+
+    // Film / Stop-Motion: grano analógico suave a 12 fps
+    float stepF = floor(uTime * 12.0);
+    vec2 jitter = vec2(fract(stepF * 0.7548776) * 193.0, fract(stepF * 0.5698402) * 271.0);
+    float g = (hash21(cell + jitter) + hash21(cell * 0.5 - jitter)) * 0.5 - 0.5;
+    float weight = (matType == 0) ? (0.17 * mix(1.35, 0.95, luma)) : 0.075;
+    return clamp(srgb + vec3(g * s * weight), 0.0, 1.0);
   }
 
   // Sombras suaves PCF de 16 muestras
@@ -166,7 +234,8 @@
         noise3(vLocalPos * 120.0 + vec3(0.0, 27.4, 0.0)) - 0.5,
         noise3(vLocalPos * 120.0 + vec3(0.0, 0.0, 41.7)) - 0.5
       );
-      N = normalize(N + microN * 0.011);
+      float extraBump = (uGrainMode == 2) ? (0.045 * uGrainStrength) : ((uGrainMode == 1) ? (0.014 * uGrainStrength) : 0.0);
+      N = normalize(N + microN * (0.011 + extraBump));
       // En fondos oscuros subimos ligeramente F0 y albedo base para siluetear el negro mate
       albedo += vec3(0.010, 0.011, 0.013) * uDarkTone;
       F0 += 0.022 * uDarkTone;
@@ -225,16 +294,21 @@
       color *= mix(0.82, 1.0, smoothstep(0.0, 0.16, max(vWorldPos.y - (-1.68), 0.0)));
     }
 
+    float keyNoL = max(dot(N, keyDir), 0.0);
+
     if (uMatType == 3) {
       vec2 boxDist = abs(vWorldPos.xz) - vec2(1.19);
       color *= mix(0.76, 1.0, smoothstep(0.0, 0.54, length(max(boxDist, 0.0))));
-      vec3 mapped = pow(acesToneMap(color), vec3(1.0 / 2.2));
+      vec3 mapped = applyEditorialGrain(pow(acesToneMap(color), vec3(1.0 / 2.2)), vLocalPos, keyNoL, shadow, uMatType);
+      vec3 bgGrain = applyEditorialGrain(uBgColor, vLocalPos, 1.0, 1.0, 3);
       float fade = smoothstep(2.8, 9.2, length(vWorldPos.xz));
-      fragColor = vec4(mix(mapped, uBgColor, fade), 1.0);
+      fragColor = vec4(mix(mapped, bgGrain, fade), 1.0);
       return;
     }
 
-    fragColor = vec4(pow(acesToneMap(color), vec3(1.0 / 2.2)), 1.0);
+    vec3 outColor = pow(acesToneMap(color), vec3(1.0 / 2.2));
+    outColor = applyEditorialGrain(outColor, vLocalPos, keyNoL, shadow, uMatType);
+    fragColor = vec4(outColor, 1.0);
   }`;
 
   function compileShader(gl, type, source) {
@@ -296,22 +370,28 @@
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([255, 255, 255, 255]));
     }
 
+    const GRAIN_MODES = { off: 0, riso: 1, clay: 2, film: 3 };
+
     const uShadowMVP = shadowProg ? gl.getUniformLocation(shadowProg, 'uLightMVP') : null;
     const u = {
-      model:      gl.getUniformLocation(mainProg, 'uModel'),
-      viewProj:   gl.getUniformLocation(mainProg, 'uViewProj'),
-      normalMat:  gl.getUniformLocation(mainProg, 'uNormalMat'),
-      lightSpace: gl.getUniformLocation(mainProg, 'uLightSpace'),
-      camPos:     gl.getUniformLocation(mainProg, 'uCamPos'),
-      albedo:     gl.getUniformLocation(mainProg, 'uAlbedo'),
-      roughness:  gl.getUniformLocation(mainProg, 'uRoughness'),
-      f0:         gl.getUniformLocation(mainProg, 'uF0'),
-      matType:    gl.getUniformLocation(mainProg, 'uMatType'),
-      logoHeight: gl.getUniformLocation(mainProg, 'uLogoHeight'),
-      useShadows: gl.getUniformLocation(mainProg, 'uUseShadows'),
-      darkTone:   gl.getUniformLocation(mainProg, 'uDarkTone'),
-      bgColor:    gl.getUniformLocation(mainProg, 'uBgColor'),
-      shadowMap:  gl.getUniformLocation(mainProg, 'uShadowMap')
+      model:         gl.getUniformLocation(mainProg, 'uModel'),
+      viewProj:      gl.getUniformLocation(mainProg, 'uViewProj'),
+      normalMat:     gl.getUniformLocation(mainProg, 'uNormalMat'),
+      lightSpace:    gl.getUniformLocation(mainProg, 'uLightSpace'),
+      camPos:        gl.getUniformLocation(mainProg, 'uCamPos'),
+      albedo:        gl.getUniformLocation(mainProg, 'uAlbedo'),
+      roughness:     gl.getUniformLocation(mainProg, 'uRoughness'),
+      f0:            gl.getUniformLocation(mainProg, 'uF0'),
+      matType:       gl.getUniformLocation(mainProg, 'uMatType'),
+      logoHeight:    gl.getUniformLocation(mainProg, 'uLogoHeight'),
+      useShadows:    gl.getUniformLocation(mainProg, 'uUseShadows'),
+      darkTone:      gl.getUniformLocation(mainProg, 'uDarkTone'),
+      bgColor:       gl.getUniformLocation(mainProg, 'uBgColor'),
+      shadowMap:     gl.getUniformLocation(mainProg, 'uShadowMap'),
+      grainMode:     gl.getUniformLocation(mainProg, 'uGrainMode'),
+      grainStrength: gl.getUniformLocation(mainProg, 'uGrainStrength'),
+      grainScale:    gl.getUniformLocation(mainProg, 'uGrainScale'),
+      time:          gl.getUniformLocation(mainProg, 'uTime')
     };
 
     const lightView = Math3D.lookAt([3.8, 10.2, 3.2], [0.0, -0.2, 0.0], [0, 1, 0]);
@@ -325,9 +405,15 @@
       gl.drawElements(gl.TRIANGLES, countOverride !== undefined ? countOverride : mesh.count, gl.UNSIGNED_INT, 0);
     }
 
-    function renderFrame({ dynamicItems, stage, cam, targetY, floatWave, darkTone = 0 }) {
+    function renderFrame({ dynamicItems, stage, cam, targetY, floatWave, darkTone = 0, grain }) {
       const width = canvas.width;
       const height = canvas.height;
+      const gMode = typeof grain?.mode === 'number'
+        ? grain.mode
+        : (GRAIN_MODES[grain?.mode || 'riso'] ?? 1);
+      const gStrength = Number.isFinite(grain?.strength) ? grain.strength : 0.65;
+      const gScale = Number.isFinite(grain?.scale) ? grain.scale : 1.35;
+      const gTime = Number.isFinite(grain?.time) ? grain.time : 0.0;
 
       // Paso 1: Mapa de sombras (solo en modo exhibición con pedestal)
       if (!transparent && stage) {
@@ -384,6 +470,10 @@
       gl.uniform1f(u.logoHeight, floatWave * 0.5 + 0.5);
       gl.uniform1f(u.useShadows, transparent ? 0.0 : 1.0);
       gl.uniform1f(u.darkTone, darkTone);
+      gl.uniform1i(u.grainMode, gMode);
+      gl.uniform1f(u.grainStrength, gStrength);
+      gl.uniform1f(u.grainScale, gScale);
+      gl.uniform1f(u.time, gTime);
 
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, shadowTex);

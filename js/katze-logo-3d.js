@@ -26,7 +26,7 @@
 
   class KatzeLogo3DElement extends HTMLElement {
     static get observedAttributes() {
-      return ['model', 'tone', 'speed', 'float', 'zoom', 'hold', 'interactive', 'paused'];
+      return ['model', 'tone', 'speed', 'float', 'zoom', 'hold', 'interactive', 'paused', 'grain', 'grain-strength', 'grain-scale'];
     }
 
     constructor() {
@@ -153,6 +153,11 @@
       this._holdDuration = Number.isFinite(parsedHold) ? parsedHold : 4.5;
 
       this._darkTone = this.getAttribute('tone') === 'dark' ? 1.0 : 0.0;
+      this._grainMode = (this.getAttribute('grain') || 'riso').toLowerCase();
+      const parsedGrain = parseFloat(this.getAttribute('grain-strength'));
+      this._grainStrength = Number.isFinite(parsedGrain) ? Math.max(0, Math.min(1, parsedGrain)) : 0.65;
+      const parsedScale = parseFloat(this.getAttribute('grain-scale'));
+      this._grainScale = Number.isFinite(parsedScale) ? Math.max(0.6, Math.min(3.0, parsedScale)) : 1.35;
       this._interactive = this.getAttribute('interactive') !== 'false';
       this._paused = this.hasAttribute('paused');
 
@@ -255,7 +260,13 @@
         cam: this._cam,
         targetY: 0.0,
         floatWave,
-        darkTone: this._darkTone
+        darkTone: this._darkTone,
+        grain: {
+          mode: this._grainMode,
+          strength: this._grainStrength,
+          scale: this._grainScale,
+          time: this._animTime
+        }
       });
     }
   }
